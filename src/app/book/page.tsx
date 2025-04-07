@@ -46,8 +46,8 @@ export default function BookPage() {
     const dateStr = selectedDate.toISOString().split('T')[0];
     try {
       const res = await fetch(`${API_BASE}/availability?serviceId=${selectedService}&date=${dateStr}`);
-      const slots = await res.json();
-      setAvailableSlots(slots);
+      const resJson = await res.json();
+      setAvailableSlots(resJson.availability || []);
     } catch {
       setFeedback('❌ Failed to fetch availability.');
     }
