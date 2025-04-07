@@ -11,12 +11,9 @@ type Service = {
   duration: number;
 };
 
-// ========== CONFIG ==========
 const API_BASE = 'https://prism-production-8537.up.railway.app';
 
-// ========== MAIN ==========
 export default function BookPage() {
-  // ======= STATE =======
   const [services, setServices] = useState<Service[]>([]);
   const [selectedService, setSelectedService] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -25,15 +22,15 @@ export default function BookPage() {
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState('');
 
-  // ======= FETCH SERVICES =======
+  // Fetch services on load
   useEffect(() => {
     fetch(`${API_BASE}/services`)
       .then((res) => res.json())
-      .then(setServices)
+      .then((data) => setServices(data))
       .catch(() => setFeedback('❌ Failed to load services.'));
   }, []);
 
-  // ======= FETCH AVAILABILITY =======
+  // Refetch slots when service or date changes
   useEffect(() => {
     if (selectedService && selectedDate) {
       fetchAvailability();
@@ -41,19 +38,17 @@ export default function BookPage() {
   }, [selectedService, selectedDate]);
 
   const fetchAvailability = async () => {
-    if (!selectedService || !selectedDate) return;
-
-    const dateStr = selectedDate.toISOString().split('T')[0];
+    const dateStr = selectedDate?.toISOString().split('T')[0];
     try {
       const res = await fetch(`${API_BASE}/availability?serviceId=${selectedService}&date=${dateStr}`);
-      const resJson = await res.json();
-      setAvailableSlots(resJson.availability || []);
-    } catch {
+      const json = await res.json();
+      const slots = Array.isArray(json.availability) ? json.availability : [];
+      setAvailableSlots(slots);
+    } catch (err) {
       setFeedback('❌ Failed to fetch availability.');
     }
   };
 
-  // ======= BOOKING LOGIC =======
   const handleBooking = async () => {
     if (!selectedService || !selectedDate || !selectedSlot) {
       setFeedback('❗ Please fill out all fields.');
@@ -88,15 +83,15 @@ export default function BookPage() {
         }),
       });
 
-      if (!res.ok) {
-        const error = await res.json();
-        setFeedback(`❌ Booking failed: ${error?.error || 'Unknown error'}`);
-        return;
-      }
+      const resJson = await res.json();
 
-      setFeedback('✅ Booking confirmed!');
-      setSelectedSlot('');
-      fetchAvailability();
+      if (!res.ok) {
+        setFeedback(`❌ Booking failed: ${resJson?.error || 'Unknown error'}`);
+      } else {
+        setFeedback('✅ Booking confirmed!');
+        setSelectedSlot('');
+        fetchAvailability();
+      }
     } catch (err) {
       console.error(err);
       setFeedback('❌ Booking failed. Try again.');
@@ -105,7 +100,6 @@ export default function BookPage() {
     }
   };
 
-  // ======= RENDER UI =======
   return (
     <div className="max-w-md mx-auto p-6 text-white">
       <h1 className="text-2xl font-bold mb-4">Book a Service</h1>
