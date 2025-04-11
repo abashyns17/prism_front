@@ -1,71 +1,58 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import { Authorizer } from '@authorizerdev/authorizer-js';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
-const authorizer = new Authorizer({
-  authorizerURL: process.env.NEXT_PUBLIC_AUTHORIZER_URL!,
-  clientID: process.env.NEXT_PUBLIC_AUTHORIZER_CLIENT_ID!,
-  redirectURL: typeof window !== 'undefined' ? window.location.origin : '',
-});
+const LoginPage = () => {
+  const [loginStatus, setLoginStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
-export default function LoginPage() {
-  const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const authorizer = useMemo(() => new Authorizer({
+    authorizerURL: process.env.NEXT_PUBLIC_AUTHORIZER_URL!,
+    clientID: process.env.NEXT_PUBLIC_AUTHORIZER_CLIENT_ID!,
+    redirectURL: process.env.NEXT_PUBLIC_REDIRECT_URL!,
+  }), []);
 
-  const handleLogin = async () => {
-    setError('');
-    try {
-      const { data, errors } = await authorizer.login({
-        email,
-        password,
-      });
-
-      if (errors?.length || !data?.access_token) {
-        setError('Login failed. Check credentials.');
-        return;
+  useEffect(() => {
+    const checkLogin = async () => {
+      setLoginStatus('loading');
+      try {
+        const session = await authorizer.getSession();
+        if (session?.data?.user) {
+          setLoginStatus('success');
+          window.location.href = '/dashboard';
+        } else {
+          setLoginStatus('idle');
+        }
+      } catch (err) {
+        console.error('Login check failed', err);
+        setLoginStatus('error');
       }
+    };
 
-      // ✅ Save token in localStorage for booking to use
-      localStorage.setItem('authorizer-token', data.access_token);
+    checkLogin();
+  }, [authorizer]);
 
-      // ✅ Optional: store ID token too if needed later
-      localStorage.setItem('authorizer-id-token', data.id_token);
-
-      router.push('/dashboard');
-    } catch (err) {
-      console.error(err);
-      setError('Something went wrong. Try again.');
-    }
+  const login = () => {
+    authorizer.authorize({
+      response_type: 'code',
+      response_mode: 'web_message',
+      use_refresh_token: true,
+    });
   };
 
   return (
-    <div className="p-4 max-w-sm mx-auto space-y-4">
-      <h1 className="text-xl font-bold">Login</h1>
-      <input
-        type="email"
-        placeholder="Email"
-        className="w-full p-2 border rounded"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
-      <input
-        type="password"
-        placeholder="Password"
-        className="w-full p-2 border rounded"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
+    <main className="flex flex-col items-center justify-center min-h-screen text-white">
+      <h1 className="text-3xl font-bold mb-6">Login</h1>
       <button
-        onClick={handleLogin}
-        className="w-full p-2 bg-black text-white rounded"
+        onClick={login}
+        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
       >
-        Log in
+        Sign In with Authorizer
       </button>
-      {error && <p className="text-red-600">{error}</p>}
-    </div>
+      {loginStatus === 'loading' && <p className="mt-4">Checking session...</p>}
+      {loginStatus === 'error' && <p className="mt-4 text-red-500">Login failed. Please try again.</p>}
+    </main>
   );
-}
+};
+
+export default LoginPage;
