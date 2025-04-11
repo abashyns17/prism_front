@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Authorizer } from '@authorizerdev/authorizer-js';
+import { Authorizer, ResponseType } from '@authorizerdev/authorizer-js';
 
 const LoginPage = () => {
   const [loginStatus, setLoginStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -34,7 +34,7 @@ const LoginPage = () => {
 
   const login = () => {
     authorizer.authorize({
-      response_type: 'code',
+      response_type: ResponseType.Code,
       response_mode: 'web_message',
       use_refresh_token: true,
     });
