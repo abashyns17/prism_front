@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 export default function DashboardPage() {
-  const { user, token } = useAuthorizer();
+  const { user, token, logout } = useAuthorizer();
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -20,9 +20,7 @@ export default function DashboardPage() {
           },
         });
 
-        if (!res.ok) {
-          throw new Error('Failed to fetch');
-        }
+        if (!res.ok) throw new Error('Failed to fetch');
 
         const data = await res.json();
         setBookings(data);
@@ -44,6 +42,12 @@ export default function DashboardPage() {
         <div className="mb-6 bg-gray-100 p-4 rounded-lg border border-gray-300">
           <p><strong>User ID:</strong> {user.id}</p>
           <p><strong>Email:</strong> {user.email}</p>
+          <button
+            onClick={logout}
+            className="mt-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
+          >
+            Logout
+          </button>
         </div>
       )}
 
