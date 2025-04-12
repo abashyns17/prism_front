@@ -46,9 +46,20 @@ export default function BookPage() {
       try {
         const res = await fetch(`${API_BASE}/availability?serviceId=${selectedService}&date=${selectedDate}`);
         const data = await res.json();
-        setAvailableSlots(data);
+
+        if (Array.isArray(data)) {
+          setAvailableSlots(data);
+          if (data.length === 0) {
+            setFeedback('⚠️ No available slots for this service on the selected date.');
+          }
+        } else {
+          console.warn('Invalid slot data:', data);
+          setAvailableSlots([]);
+          setFeedback('⚠️ Failed to load availability.');
+        }
       } catch (err) {
         console.error('Failed to fetch slots:', err);
+        setFeedback('❗ Error loading slots.');
       }
     };
     fetchSlots();
