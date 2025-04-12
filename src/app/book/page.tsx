@@ -14,6 +14,7 @@ export default function BookPage() {
   const router = useRouter();
   const [services, setServices] = useState<Service[]>([]);
   const [selectedService, setSelectedService] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [selectedSlot, setSelectedSlot] = useState('');
   const [feedback, setFeedback] = useState('');
@@ -39,15 +40,19 @@ export default function BookPage() {
     }
   }, []);
 
-  const fetchSlots = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/availability?serviceId=${selectedService}`);
-      const data = await res.json();
-      setAvailableSlots(data);
-    } catch (err) {
-      console.error('Failed to fetch slots:', err);
-    }
-  };
+  useEffect(() => {
+    const fetchSlots = async () => {
+      if (!selectedService || !selectedDate) return;
+      try {
+        const res = await fetch(`${API_BASE}/availability?serviceId=${selectedService}&date=${selectedDate}`);
+        const data = await res.json();
+        setAvailableSlots(data);
+      } catch (err) {
+        console.error('Failed to fetch slots:', err);
+      }
+    };
+    fetchSlots();
+  }, [selectedService, selectedDate]);
 
   const handleBooking = async () => {
     const token = localStorage.getItem('authorizer-token');
@@ -59,7 +64,7 @@ export default function BookPage() {
     try {
       const parsedSlot = new Date(selectedSlot);
       const dateStr = parsedSlot.toISOString().split('T')[0];
-      const timeStr = parsedSlot.toTimeString().slice(0, 5); // "HH:mm"
+      const timeStr = parsedSlot.toTimeString().slice(0, 5);
 
       const res = await fetch(`${API_BASE}/bookings`, {
         method: 'POST',
@@ -103,13 +108,13 @@ export default function BookPage() {
         ))}
       </select>
 
-      <button
-        className="bg-blue-500 text-white px-4 py-2 mb-4"
-        onClick={fetchSlots}
-        disabled={!selectedService}
-      >
-        Load Available Slots
-      </button>
+      <label className="block mb-1">Select Date:</label>
+      <input
+        type="date"
+        className="border p-2 mb-4"
+        value={selectedDate}
+        onChange={(e) => setSelectedDate(e.target.value)}
+      />
 
       <label className="block mb-1">Select Slot:</label>
       <select
