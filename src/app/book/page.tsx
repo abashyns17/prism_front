@@ -56,10 +56,23 @@ export default function BookPage() {
     }
 
     const token = localStorage.getItem('authorizer-token');
+
     if (!token) {
       setFeedback('❗ You must be logged in to book.');
       return;
     }
+    
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/bookings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`, // ✅ attach token
+      },
+      body: JSON.stringify({
+        // your booking payload
+      }),
+    });
+    
 
     const parsedSlot = new Date(selectedSlot);
     if (isNaN(parsedSlot.getTime())) {

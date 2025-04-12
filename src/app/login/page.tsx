@@ -6,22 +6,53 @@ import { Authorizer, ResponseTypes } from '@authorizerdev/authorizer-js';
 const LoginPage = () => {
   const [loginStatus, setLoginStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
-  const authorizer = useMemo(() => new Authorizer({
-    authorizerURL: process.env.NEXT_PUBLIC_AUTHORIZER_URL!,
-    clientID: process.env.NEXT_PUBLIC_AUTHORIZER_CLIENT_ID!,
-    redirectURL: process.env.NEXT_PUBLIC_REDIRECT_URL!,
-  }), []);
+  const authorizer = useMemo(() => {
+    const authorizerURL = process.env.NEXT_PUBLIC_AUTHORIZER_URL?.trim() || '';
+    const clientID = process.env.NEXT_PUBLIC_AUTHORIZER_CLIENT_ID?.trim() || '';
+    const redirectURL = process.env.NEXT_PUBLIC_REDIRECT_URL?.trim() || '';
+
+    if (!authorizerURL || !clientID || !redirectURL) {
+      console.warn('⚠️ Missing one or more Authorizer env variables');
+    }
+
+    return new Authorizer({
+      authorizerURL,
+      clientID,
+      redirectURL,
+    });
+  }, []);
+
+  const refreshToken = async () => {
+    try {
+      const res = await authorizer.getSession(); // will auto-refresh if refresh token exists
+      if (res?.data?.access_token) {
+        localStorage.setItem('authorizer-token', res.data.access_token);
+        setLoginStatus('success');
+        return true;
+      }
+    } catch (err) {
+      console.error('Token refresh failed', err);
+    }
+    setLoginStatus('error');
+    return false;
+  };
 
   useEffect(() => {
     const checkLogin = async () => {
       setLoginStatus('loading');
       try {
         const session = await authorizer.getSession();
+
+        if (session?.data?.access_token) {
+          localStorage.setItem('authorizer-token', session.data.access_token);
+        }
+
         if (session?.data?.user) {
           setLoginStatus('success');
           window.location.href = '/dashboard';
         } else {
-          setLoginStatus('idle');
+          // Try to refresh token if session is missing
+          await refreshToken();
         }
       } catch (err) {
         console.error('Login check failed', err);
