@@ -3,13 +3,18 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+interface Service {
+  id: string;
+  name: string;
+}
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
 export default function BookPage() {
   const router = useRouter();
-  const [services, setServices] = useState([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [selectedService, setSelectedService] = useState('');
-  const [availableSlots, setAvailableSlots] = useState([]);
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [selectedSlot, setSelectedSlot] = useState('');
   const [feedback, setFeedback] = useState('');
 
@@ -21,6 +26,7 @@ export default function BookPage() {
         setServices(data);
       } catch (err) {
         console.error('Failed to fetch services:', err);
+        setFeedback('❗ Failed to load services.');
       }
     };
     fetchServices();
