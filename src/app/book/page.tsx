@@ -1,89 +1,58 @@
-'use client';
-
 import { useEffect, useState } from 'react';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
+import { useRouter } from 'next/navigation';
 
-type Service = {
-  id: string;
-  name: string;
-  price: number;
-  duration: number;
-};
-
-const API_BASE = 'https://prism-production-8537.up.railway.app';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
 export default function BookPage() {
-  const [services, setServices] = useState<Service[]>([]);
+  const router = useRouter();
+  const [services, setServices] = useState([]);
   const [selectedService, setSelectedService] = useState('');
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [availableSlots, setAvailableSlots] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState('');
-  const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState('');
 
-  // Fetch services on load
   useEffect(() => {
-    fetch(`${API_BASE}/services`)
-      .then((res) => res.json())
-      .then((data) => setServices(data))
-      .catch(() => setFeedback('❌ Failed to load services.'));
+    const fetchServices = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/services`);
+        const data = await res.json();
+        setServices(data);
+      } catch (err) {
+        console.error('Failed to fetch services:', err);
+      }
+    };
+    fetchServices();
   }, []);
 
-  // Refetch slots when service or date changes
   useEffect(() => {
-    if (selectedService && selectedDate) {
-      fetchAvailability();
+    const token = localStorage.getItem('authorizer-token');
+    if (!token) {
+      setFeedback('❗ You must be logged in to book.');
     }
-  }, [selectedService, selectedDate]);
+  }, []);
 
-  const fetchAvailability = async () => {
-    const dateStr = selectedDate?.toISOString().split('T')[0];
+  const fetchSlots = async () => {
     try {
-      const res = await fetch(`${API_BASE}/availability?serviceId=${selectedService}&date=${dateStr}`);
-      const json = await res.json();
-      const slots = Array.isArray(json.availability) ? json.availability : [];
-      setAvailableSlots(slots);
+      const res = await fetch(`${API_BASE}/availability?serviceId=${selectedService}`);
+      const data = await res.json();
+      setAvailableSlots(data);
     } catch (err) {
-      setFeedback('❌ Failed to fetch availability.');
+      console.error('Failed to fetch slots:', err);
     }
   };
 
   const handleBooking = async () => {
-    if (!selectedService || !selectedDate || !selectedSlot) {
-      setFeedback('❗ Please fill out all fields.');
-      return;
-    }
-
     const token = localStorage.getItem('authorizer-token');
-
     if (!token) {
       setFeedback('❗ You must be logged in to book.');
       return;
     }
-    
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/bookings`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`, // ✅ attach token
-      },
-      body: JSON.stringify({
-        // your booking payload
-      }),
-    });
-    
-
-    const parsedSlot = new Date(selectedSlot);
-    if (isNaN(parsedSlot.getTime())) {
-      setFeedback('❗ Invalid time selected.');
-      return;
-    }
-
-    setLoading(true);
-    setFeedback('');
 
     try {
+      const parsedSlot = new Date(selectedSlot);
+      const dateStr = parsedSlot.toISOString().split('T')[0];
+      const timeStr = parsedSlot.toTimeString().slice(0, 5); // "HH:mm"
+
       const res = await fetch(`${API_BASE}/bookings`, {
         method: 'POST',
         headers: {
@@ -92,89 +61,71 @@ export default function BookPage() {
         },
         body: JSON.stringify({
           serviceId: selectedService,
-          startTime: parsedSlot.toISOString(),
+          date: dateStr,
+          time: timeStr,
         }),
       });
 
-      const resJson = await res.json();
-
-      if (!res.ok) {
-        setFeedback(`❌ Booking failed: ${resJson?.error || 'Unknown error'}`);
+      if (res.ok) {
+        setFeedback('✅ Booking successful!');
+        router.push('/dashboard');
       } else {
-        setFeedback('✅ Booking confirmed!');
-        setSelectedSlot('');
-        fetchAvailability();
+        const errData = await res.json();
+        setFeedback(`❌ Booking failed: ${errData.error}`);
       }
     } catch (err) {
-      console.error(err);
-      setFeedback('❌ Booking failed. Try again.');
-    } finally {
-      setLoading(false);
+      console.error('Booking error:', err);
+      setFeedback('❌ Something went wrong.');
     }
   };
 
   return (
-    <div className="max-w-md mx-auto p-6 text-white">
-      <h1 className="text-2xl font-bold mb-4">Book a Service</h1>
+    <div className="p-4">
+      <h1 className="text-xl font-bold mb-2">Book a Service</h1>
 
-      {/* Service Picker */}
-      <div className="mb-4">
-        <label className="block mb-2">Service:</label>
-        <select
-          value={selectedService}
-          onChange={(e) => setSelectedService(e.target.value)}
-          className="w-full p-2 rounded border bg-white text-black"
-        >
-          <option value="">Select a service</option>
-          {services.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name} (${s.price}, {s.duration} min)
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Date Picker */}
-      <div className="mb-4">
-        <label className="block mb-2">Date:</label>
-        <DatePicker
-          selected={selectedDate}
-          onChange={(date) => setSelectedDate(date)}
-          dateFormat="yyyy-MM-dd"
-          minDate={new Date()}
-          placeholderText="Select a date"
-          className="w-full p-2 rounded border bg-white text-black"
-        />
-      </div>
-
-      {/* Slot Picker */}
-      <div className="mb-4">
-        <label className="block mb-2">Available Time Slots:</label>
-        <select
-          value={selectedSlot}
-          onChange={(e) => setSelectedSlot(e.target.value)}
-          className="w-full p-2 rounded border bg-white text-black"
-        >
-          <option value="">Select a time</option>
-          {availableSlots.map((iso) => (
-            <option key={iso} value={iso}>
-              {new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Feedback */}
-      {feedback && <p className="text-yellow-400 text-sm mb-4">{feedback}</p>}
-
-      {/* Book Button */}
-      <button
-        onClick={handleBooking}
-        disabled={loading}
-        className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 disabled:opacity-50"
+      <label className="block mb-1">Select Service:</label>
+      <select
+        className="border p-2 mb-4"
+        value={selectedService}
+        onChange={(e) => setSelectedService(e.target.value)}
       >
-        {loading ? 'Booking...' : 'Book'}
+        <option value="">-- Choose --</option>
+        {services.map((s) => (
+          <option key={s.id} value={s.id}>{s.name}</option>
+        ))}
+      </select>
+
+      <button
+        className="bg-blue-500 text-white px-4 py-2 mb-4"
+        onClick={fetchSlots}
+        disabled={!selectedService}
+      >
+        Load Available Slots
       </button>
+
+      <label className="block mb-1">Select Slot:</label>
+      <select
+        className="border p-2 mb-4"
+        value={selectedSlot}
+        onChange={(e) => setSelectedSlot(e.target.value)}
+      >
+        <option value="">-- Choose --</option>
+        {availableSlots.map((iso) => (
+          <option key={iso} value={iso}>
+            {new Date(iso).toLocaleString()}
+          </option>
+        ))}
+      </select>
+
+      <button
+        className="bg-green-600 text-white px-4 py-2"
+        onClick={handleBooking}
+        disabled={!selectedSlot || !selectedService}
+      >
+        Confirm Booking
+      </button>
+
+      {feedback && <p className="mt-4 text-red-600">{feedback}</p>}
     </div>
   );
 }
